@@ -3,39 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ПИОНЕР | Корпоративный портал</title>
-  <style>
-    :root { color-scheme: dark; --bg: #10221c; --panel: #17352a; --text: #f5f1e8; --muted: #b7c9bd; --accent: #e5b85c; }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: radial-gradient(circle at 85% 10%, #285740, var(--bg) 42%); color: var(--text); font: 16px/1.6 system-ui, sans-serif; }
-    main { width: min(980px, calc(100% - 32px)); margin: 0 auto; padding: 72px 0; }
-    .eyebrow { color: var(--accent); letter-spacing: .14em; text-transform: uppercase; font-size: .78rem; font-weight: 700; }
-    h1 { max-width: 760px; margin: 12px 0 20px; font: 700 clamp(2.5rem, 8vw, 5.8rem)/.95 Georgia, serif; }
-    h2 { font: 700 1.7rem Georgia, serif; }
-    .lead { max-width: 680px; color: var(--muted); font-size: 1.15rem; }
-    .actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 30px 0 62px; }
-    a { color: inherit; }
-    .button { display: inline-block; padding: 11px 17px; border: 1px solid var(--accent); border-radius: 999px; color: #17251d; background: var(--accent); text-decoration: none; font-weight: 700; }
-    .button.alt { color: var(--text); background: transparent; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
-    .card { padding: 22px; border: 1px solid #326249; border-radius: 18px; background: color-mix(in srgb, var(--panel) 88%, transparent); }
-    .card p { color: var(--muted); margin-bottom: 0; }
-    footer { margin-top: 60px; color: var(--muted); font-size: .9rem; }
-  </style>
+  <meta name="theme-color" content="#102d23">
+  <title>ПИОНЕР. Внутренний портал</title>
+  <link rel="stylesheet" href="app.css">
 </head>
 <body>
-  <main>
-    <span class="eyebrow">Pioneer · internal tools</span>
-    <h1>ПИОНЕР. Внутренний портал</h1>
-    <p class="lead">Локальный корпоративный портал для задач, сотрудников, согласований, календаря, коммуникаций и аналитики.</p>
-    <div class="actions"><span class="button">Исходный код находится в этом репозитории</span></div>
-    <section class="grid">
-      <article class="card"><h2>Задачи</h2><p>Исполнители, наблюдатели, приоритеты, дедлайны и двойное согласование.</p></article>
-      <article class="card"><h2>Команда</h2><p>Карточки сотрудников, роли, права, статусы и автоматические подмены.</p></article>
-      <article class="card"><h2>Рабочий день</h2><p>Новости, сообщения, календарь, встречи, помещения и бронирования.</p></article>
-      <article class="card"><h2>Контроль</h2><p>Аналитика отделов, недельные отчёты, уведомления и экспорт в CSV.</p></article>
-    </section>
-    <footer>Демонстрационная статическая страница GitHub Pages. Полный Flask-портал запускается локально через <code>ЗАПУСТИТЬ_ПИОНЕР.bat</code>.</footer>
-  </main>
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="#overview"><span class="brand-mark">П</span><span>ПИОНЕР</span></a>
+    <nav class="main-nav" id="mainNav">
+      <span class="nav-group">Главное</span><a href="#overview" data-route="overview">Обзор</a>
+      <span class="nav-group">Работа</span><a href="#tasks" data-route="tasks">Задачи</a><a href="#completed" data-route="completed">Выполненные</a><a href="#calendar" data-route="calendar">Календарь</a><a href="#messages" data-route="messages">Сообщения</a>
+      <span class="nav-group">Люди</span><a href="#employees" data-route="employees">Сотрудники</a><a href="#feed" data-route="feed">Новости</a>
+      <span class="nav-group">Для руководства</span><a href="#analytics" data-route="analytics">Аналитика</a>
+      <span class="nav-group">Служебное</span><a href="#settings" data-route="settings">Настройки</a>
+    </nav>
+    <div class="sidebar-note"><strong>Интерактивная версия</strong>Данные сохраняются в этом браузере.</div>
+  </aside>
+  <div class="page-shell">
+    <header class="topbar">
+      <button class="menu-button" id="menuButton" type="button" aria-label="Открыть меню">☰</button>
+      <div><div class="topbar-kicker">Рабочее пространство</div><strong>ПИОНЕР. Внутренний портал</strong></div>
+      <div class="top-counters"><a href="#tasks">Мои задачи <strong id="taskCounter">0</strong></a><button data-action="notifications">Новые <strong id="noticeCounter">0</strong></button></div>
+      <button class="notification-bell" data-action="notifications" title="Уведомления">🔔<span class="notification-count" id="noticeBadge">0</span></button>
+      <button class="profile-avatar" data-action="profile" id="profileAvatar" title="Сменить профиль">А</button>
+    </header>
+    <main class="content" id="app" tabindex="-1"></main>
+  </div>
+  <div class="menu-overlay" id="menuOverlay"></div>
+  <div class="toast-stack" id="toasts" aria-live="polite"></div>
+  <dialog id="modal"><button class="modal-close" data-action="close-modal" aria-label="Закрыть">×</button><div id="modalBody"></div></dialog>
+  <script src="app.js"></script>
 </body>
 </html>
