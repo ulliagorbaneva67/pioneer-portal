@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Новая публикация{% endblock %}
+{% block content %}
+<section class="page-heading"><div><span class="eyebrow">Новости</span><h1>Новая публикация</h1><p>Поделитесь новостью со всей компанией или отдельным отделом.</p></div></section>
+<form class="panel form-panel" method="post" enctype="multipart/form-data">
+    <div class="form-grid">
+        <label class="field"><span>Автор *</span><select name="author_id" required><option value="">Выберите сотрудника</option>{% for employee in employees %}<option value="{{ employee.id }}">{{ employee.full_name }}</option>{% endfor %}</select></label>
+        <label class="field"><span>Тип публикации *</span><select name="post_type" required><option value="">Выберите тип</option>{% for post_type in post_types %}<option value="{{ post_type.key }}" {{ 'selected' if request.form.get('post_type') == post_type.key else '' }}>{{ post_type.label }}</option>{% endfor %}</select></label>
+        {% if not post_types or not employees %}<p class="field-wide catalog-hint">Нет типов публикаций или сотрудников. <a href="{{ url_for('settings') if not post_types else url_for('employees') }}">Создайте первое значение</a>.</p>{% endif %}
+        <label class="field field-wide"><span>Текст *</span><textarea name="text" rows="7" required placeholder="Напишите объявление...">{{ request.form.get('text', '') }}</textarea></label>
+        <label class="field"><span>Получатели</span><select name="audience_department_id"><option value="">Все сотрудники</option>{% for department in departments %}<option value="{{ department.id }}">Только: {{ department.name }}</option>{% endfor %}</select></label>
+        {% if not departments %}<p class="field-wide catalog-hint">Отделов пока нет. <a href="{{ url_for('settings', _anchor='departments') }}">Добавьте первый отдел</a>, чтобы отправлять публикации отдельным командам.</p>{% endif %}
+        <label class="field"><span>Вложения</span><input type="file" name="attachments" multiple><small>Документы и изображения, до 16 МБ суммарно</small></label>
+    </div>
+    <div class="form-actions"><a class="button ghost" href="{{ url_for('feed') }}">Отмена</a><button class="button" type="submit">Опубликовать</button></div>
+</form>
+{% endblock %}

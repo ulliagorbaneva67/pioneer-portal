@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<section class="page-heading">
+    <div><span class="eyebrow">Контроль исполнения</span><h1>{{ title }}</h1><p>{% if completed %}Архив закрытых задач сохраняется автоматически.{% else %}Просроченные задачи остаются здесь, пока не будут выполнены.{% endif %}</p></div>
+    {% if not completed %}<a class="button" href="{{ url_for('new_task') }}">+ Новая задача</a>{% endif %}
+</section>
+
+<div class="tab-bar">
+    <a class="{{ 'active' if not completed else '' }}" href="{{ url_for('tasks') }}">В работе</a>
+    <a class="{{ 'active' if completed else '' }}" href="{{ url_for('completed_tasks') }}">Выполненные</a>
+</div>
+
+<section class="panel table-panel">
+    {% if tasks %}
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Задача</th><th>Отдел</th><th>Участники</th><th>Поставлена</th><th>Дедлайн</th><th>Состояние</th><th></th></tr></thead>
+            <tbody>
+            {% for task, state, label in tasks %}
+                <tr class="task-row task-{{ state }}">
+                    <td><strong>{% if state == 'completed' %}✅{% elif state == 'overdue' %}🔴{% elif task.priority in ['Срочная', 'Критическая'] %}⏰{% elif task.priority == 'Важная' %}⚠️{% endif %} {{ task.title }}</strong><small>{{ task.description|truncate(90) or 'Без описания' }}</small><span class="priority priority-{{ task.priority|lower }}">{{ task.priority }}</span></td>
+                    <td>{{ task.department_name }}</td>
+                    <td class="task-people"><span>Исполнители:</span>{% for person in people[task.id][0] %}<span class="person-chip">{% if person.photo %}<img src="{{ url_for('uploaded_file', filename=person.photo) }}" alt="">{% else %}<i>{{ person.full_name[0] }}</i>{% endif %}{{ person.full_name }}{{ ' (уволен)' if person.is_dismissed else '' }}</span>{% endfor %}<small>Наблюдатели:</small>{% for person in people[task.id][1] %}<span class="person-chip">{% if person.photo %}<img src="{{ url_for('uploaded_file', filename=person.photo) }}" alt="">{% else %}<i>{{ person.full_name[0] }}</i>{% endif %}{{ person.full_name }}{{ ' (уволен)' if person.is_dismissed else '' }}</span>{% else %}<small>—</small>{% endfor %}</td>
+                    <td>{{ task.created_date|ru_date }}</td>
+                    <td><strong>{{ task.deadline|ru_datetime }}</strong></td>
+                    <td><span class="status-badge status-{{ state }}">{{ label }}</span></td>
+                    <td class="actions-cell">
+                        <a class="icon-action" href="{{ url_for('edit_task', task_id=task.id) }}" title="Открыть карточку">Открыть карточку</a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state large"><strong>{{ 'Архив пока пуст' if completed else 'Все задачи выполнены' }}</strong><span>{{ 'Закрытые задачи появятся здесь.' if completed else 'Создайте новую задачу, когда она появится.' }}</span></div>
+    {% endif %}
+</section>
+{% endblock %}

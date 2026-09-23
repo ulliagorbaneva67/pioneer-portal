@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Новая планёрка{% endblock %}
+{% block content %}
+<section class="page-heading"><div><span class="eyebrow">Планёрки</span><h1>Создать комнату</h1><p>Добавьте время, участников и ссылку на сервис видеосвязи.</p></div></section>
+<form class="panel form-panel narrow" method="post">
+    <div class="form-grid">
+        <label class="field field-wide"><span>Тема *</span><input name="topic" required value="{{ request.form.get('topic', '') }}" placeholder="Еженедельная планёрка"></label>
+        <label class="field"><span>Дата и время *</span><input type="datetime-local" name="meeting_at" required value="{{ request.form.get('meeting_at', '') }}"></label>
+        <label class="field"><span>Тип события *</span><select name="event_type" required>{% for item in event_types %}<option value="{{ item.key }}">{{ item.icon }} {{ item.label }}</option>{% endfor %}</select></label>
+        <label class="field"><span>Ссылка на видеовстречу</span><input type="url" name="link" value="{{ request.form.get('link', '') }}" placeholder="https://telemost.yandex.ru/..."><small>Яндекс Телемост, VK Звонки или Контур.Толк</small></label>
+        <label class="field field-wide"><span>Участники *</span><select name="participants" multiple required size="6">{% for employee in employees %}<option value="{{ employee.id }}">{{ employee.full_name }}</option>{% endfor %}</select><small>Для нескольких: Ctrl + щелчок</small></label>
+        {% if not employees %}<p class="field-wide catalog-hint">В справочнике пока нет сотрудников. <a href="{{ url_for('employee_form') }}">Добавьте первого сотрудника</a>.</p>{% endif %}
+        <label class="field field-wide"><span>Комментарий к встрече</span><textarea name="notes" rows="4" placeholder="Повестка и вопросы к обсуждению">{{ request.form.get('notes', '') }}</textarea></label>
+    </div>
+    <div class="form-actions"><a class="button ghost" href="{{ url_for('meetings') }}">Отмена</a><button class="button" type="submit">Создать комнату</button></div>
+</form>
+{% endblock %}

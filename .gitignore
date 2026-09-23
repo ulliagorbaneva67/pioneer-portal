@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.py[cod]
+backups/
+pioneer.db
+*.db
+uploads/*
+!uploads/.gitkeep
+ПИОНЕР_*.zip
+.env
+.DS_Store

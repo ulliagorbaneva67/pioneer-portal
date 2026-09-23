@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Новости{% endblock %}
+{% block content %}
+<section class="page-heading"><div><span class="eyebrow">Жизнь компании</span><h1>Лента ПИОНЕР</h1><p>Объявления, новости и обсуждения команды.</p><div class="tab-bar"><a class="{{ 'active' if selected_filter == 'all' else '' }}" href="{{ url_for('feed', filter='all') }}">Все</a><a class="{{ 'active' if selected_filter == 'important' else '' }}" href="{{ url_for('feed', filter='important') }}">Важные</a><a class="{{ 'active' if selected_filter == 'mine' else '' }}" href="{{ url_for('feed', filter='mine') }}">Мои</a></div></div><a class="button" href="{{ url_for('new_post') }}">+ Создать публикацию</a></section>
+<div class="feed-layout">
+    <section class="feed-list">
+        {% if posts %}
+        {% for item in posts %}
+        <article class="post-card {{ 'important' if item.post.post_type == 'Важное объявление' else '' }} {{ 'introduction' if item.post.post_type == 'Новый сотрудник' else '' }}">
+            <header class="post-header">
+                {% if item.post.subject_employee_id %}<a href="{{ url_for('employee_card', employee_id=item.post.subject_employee_id) }}">{% if item.post.subject_photo %}<img src="{{ url_for('uploaded_file', filename=item.post.subject_photo) }}" alt="{{ item.post.subject_name }}">{% else %}<span class="avatar">{{ item.post.subject_name[0] }}</span>{% endif %}</a>{% elif item.post.author_photo %}<img src="{{ url_for('uploaded_file', filename=item.post.author_photo) }}" alt="">{% else %}<span class="avatar">{{ item.post.author_name[0] }}</span>{% endif %}
+                <div><strong>{{ item.post.author_name }}</strong><small>{{ item.post.created_at|ru_datetime }} · {{ item.post.audience_name or 'Для всех' }}</small></div>
+                <span class="post-type">{{ item.post.type_label }}</span>
+            </header>
+            <div class="post-text">{{ item.post.text }}</div>
+            {% if item.attachments %}<div class="attachments">{% for attachment in item.attachments %}<a href="{{ url_for('uploaded_file', filename=attachment.stored_name, download=1) }}">↳ {{ attachment.original_name }}</a>{% endfor %}</div>{% endif %}
+            <div class="post-actions">
+                <form method="post" action="{{ url_for('toggle_like', post_id=item.post.id) }}"><button class="like-button {{ 'liked' if item.liked else '' }}" type="submit">♥ {{ item.post.like_count }}</button></form>
+                <span>{{ item.comments|length }} комментариев</span>
+            </div>
+            {% if item.comments %}<div class="comments">{% for comment in item.comments %}<div class="comment"><strong>{{ comment.author_name }}</strong><span>{{ comment.text }}</span><small>{{ comment.created_at|ru_datetime }}</small></div>{% endfor %}</div>{% endif %}
+            <form class="comment-form" method="post" action="{{ url_for('add_comment', post_id=item.post.id) }}"><input name="text" required placeholder="Написать комментарий..."><button type="submit">Отправить</button></form>
+        </article>
+        {% endfor %}
+        {% else %}<div class="panel empty-state large"><strong>Лента пока пуста</strong><span>Создайте первую публикацию.</span></div>{% endif %}
+    </section>
+    <aside class="feed-note"><strong>Правила ленты</strong><p>Важные объявления выделяются зелёным. Перед лайком или комментарием выберите сотрудника в шапке.</p></aside>
+</div>
+{% endblock %}

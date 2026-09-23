@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Выбор профиля{% endblock %}
+{% block content %}
+<section class="page-heading"><div><span class="eyebrow">Личное пространство ПИОНЕР</span><h1>Выберите свой профиль</h1><p>Для сообщений, уведомлений и работы с задачами укажите текущего сотрудника.</p></div></section>
+<form class="panel form-panel narrow" method="post" action="{{ url_for('set_current_employee') }}"><label class="field"><span>Сотрудник</span><select name="employee_id" required><option value="">Выберите себя</option>{% for employee in employees %}<option value="{{ employee.id }}">{{ employee.full_name }}</option>{% endfor %}</select></label>{% if not employees %}<p class="catalog-hint">Сотрудников пока нет. <a href="{{ url_for('employee_form') }}">Добавьте первого сотрудника</a>.</p>{% endif %}<div class="form-actions"><button class="button" type="submit">Открыть профиль</button></div></form>
+{% endblock %}

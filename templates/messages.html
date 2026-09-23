@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Сообщения{% endblock %}
+{% block content %}
+<section class="page-heading"><div><span class="eyebrow">На связи</span><h1>Сообщения ПИОНЕР</h1><p>Общий чат и личные беседы. Ранее созданные проектные группы сохранены.</p></div></section>
+<div class="chat-layout">
+    <aside class="panel chat-sidebar"><h2>Беседы</h2>{% for chat in rooms %}<a class="chat-room {{ 'active' if room and room.id == chat.id else '' }}" href="{{ url_for('messages', room_id=chat.id) }}">{{ '🌐' if chat.kind == 'general' else '👥' if chat.kind == 'group' else '💬' }} {{ room_names[chat.id] }}</a>{% endfor %}</aside>
+    <section class="panel chat-conversation">
+        {% if room %}
+        <div class="chat-heading"><div><h2>{{ room_names[room.id] }}</h2><small>Участники: {% for person in members %}{{ person.full_name }}{{ ', ' if not loop.last else '' }}{% endfor %}</small></div>{% if room.call_link %}<a class="button secondary" href="{{ room.call_link }}" target="_blank" rel="noopener noreferrer">Позвонить ↗</a>{% else %}<span class="no-link">Ссылка для звонка не указана</span>{% endif %}</div>
+        <div class="chat-thread">{% for message in chat_messages %}<article class="chat-message {{ 'mine' if current_employee.id == message.author_id else '' }}"><span class="person-chip">{% if message.photo %}<img src="{{ url_for('uploaded_file', filename=message.photo) }}" alt="">{% else %}<i>{{ message.full_name[0] }}</i>{% endif %}{{ message.full_name }}{{ ' (уволен)' if message.is_dismissed else '' }}</span><small>{{ message.created_at|ru_datetime }}{% if current_employee.id == message.author_id %} · {{ '✓✓ Прочитано' if message.read_count else '✓ Отправлено' }}{% endif %}</small>{% if message.text %}<p>{{ message.text }}</p>{% endif %}{% if message.stored_name %}<a class="text-link" href="{{ url_for('uploaded_file', filename=message.stored_name, download=1) }}">↳ {{ message.original_name }}</a>{% endif %}{% if message.text %}<a class="message-task-link" href="{{ url_for('new_task', message=message.text|truncate(120, true, '')) }}">Создать задачу из сообщения</a>{% endif %}</article>{% else %}<div class="empty-state">Сообщений пока нет. Начните беседу.</div>{% endfor %}</div>
+        <form class="chat-send" method="post" action="{{ url_for('send_chat_message', room_id=room.id) }}" enctype="multipart/form-data"><label class="sr-only" for="message-text">Сообщение</label><textarea id="message-text" name="text" rows="2" placeholder="Напишите сообщение..."></textarea><label class="field"><span>Файл</span><input type="file" name="attachment"></label><button class="button" type="submit">Отправить</button></form>
+        <form class="chat-call-form" method="post" action="{{ url_for('update_chat_call_link', room_id=room.id) }}"><label for="call-link">Ссылка для кнопки «Позвонить»</label><div><input id="call-link" name="call_link" type="url" value="{{ room.call_link }}" placeholder="https://telemost.yandex.ru/..."><button class="button secondary" type="submit">Сохранить</button></div></form>
+        {% endif %}
+    </section>
+</div>
+<section class="panel chat-create"><div class="section-heading"><div><span class="eyebrow">Новая беседа</span><h2>Личный чат</h2></div></div><div class="chat-create-grid single">
+    <form method="post" action="{{ url_for('create_chat') }}"><input type="hidden" name="kind" value="private"><label class="field"><span>Личный чат с коллегой</span><select name="participants" required><option value="">Выберите сотрудника</option>{% for person in people if person.id != current_employee.id %}<option value="{{ person.id }}">{{ person.full_name }}</option>{% endfor %}</select></label><button class="button secondary" type="submit">Открыть личный чат</button></form>
+</div></section>
+{% endblock %}

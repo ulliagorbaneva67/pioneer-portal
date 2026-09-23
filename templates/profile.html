@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Мой профиль{% endblock %}
+{% block content %}
+<section class="page-heading"><div><span class="eyebrow">Личное пространство ПИОНЕР</span><h1>Мой профиль</h1><p>Фотография и статус обновляются здесь; рабочие данные берутся из справочника сотрудников.</p></div></section>
+<section class="panel profile-panel">
+    <div class="profile-overview">
+        {% if employee.photo %}<img class="profile-photo" src="{{ url_for('uploaded_file', filename=employee.photo) }}" alt="Фотография {{ employee.full_name }}">{% else %}<div class="profile-photo profile-placeholder" aria-label="Фотографии пока нет">{{ employee.full_name[0] }}</div>{% endif %}
+        <div class="profile-summary">
+            <span class="eyebrow">Сотрудник ПИОНЕР</span>
+            <h2>{{ employee.full_name }}</h2>
+            <span class="presence-label" style="color: {{ employee.status_color or '#c33f3f' }}"><i class="presence-dot" aria-hidden="true"></i>{{ employee.status_label or '🔴 Не в сети' }}{% if employee.absence_start %} (с {{ employee.absence_start|ru_date }} по {{ employee.absence_end|ru_date }}){% endif %}</span>
+        </div>
+    </div>
+    <dl class="profile-facts">
+        <div><dt>Отдел</dt><dd>{{ employee.department_name }}</dd></div>
+        <div><dt>Должность</dt><dd>{{ employee.position }}</dd></div>
+        <div><dt>Дата рождения / возраст</dt><dd>{{ employee.birth_date|ru_date }} · {{ employee.birth_date|full_years }} лет</dd></div>
+        <div><dt>Свободные слоты</dt><dd>{{ employee.free_slots or 'Не указаны' }}</dd></div>
+    </dl>
+    <form class="profile-form" method="post" enctype="multipart/form-data">
+        <h3>Личные настройки</h3>
+        <div class="form-grid">
+            <label class="field"><span>Фотография</span><input type="file" name="photo" accept=".png,.jpg,.jpeg,.gif,.webp"><small>PNG, JPG, GIF или WEBP; до 16 МБ. Если файл не выбран, фотография не изменится.</small></label>
+            <label class="field"><span>Статус присутствия</span><select name="presence_status" required data-presence-status><option value="">Выберите статус</option>{% for status in statuses %}<option value="{{ status.key }}" {{ 'selected' if employee.presence_status == status.key else '' }} data-absence="{{ '1' if status.key in ['vacation','sick','trip','training'] else '0' }}">{{ status.label }}</option>{% endfor %}</select></label>
+            <div class="field field-wide absence-period" data-absence-period><span>Период отсутствия *</span><div class="date-pair"><label>С какого<input type="date" name="absence_start" value="{{ employee.absence_start or '' }}"></label><label>По какое<input type="date" name="absence_end" value="{{ employee.absence_end or '' }}"></label></div><small>Для отпуска, больничного, командировки и обучения обе даты обязательны.</small></div>
+            <label class="field field-wide"><span>Свободные слоты для встреч</span><textarea name="free_slots" rows="2" placeholder="Например: Вторник 14:00–16:00">{{ employee.free_slots }}</textarea></label>
+        </div>
+        {% if not statuses %}<p class="catalog-hint">Список статусов пуст. <a href="{{ url_for('settings', _anchor='statuses') }}">Добавьте первый статус в Настройках</a>.</p>{% endif %}
+        <div class="form-actions"><button class="button" type="submit">Сохранить профиль</button></div>
+    </form>
+</section>
+<section class="panel task-extra"><div class="section-heading"><div><span class="eyebrow">Личная работа</span><h2>Мои задачи</h2></div><form method="post" action="{{ url_for('create_weekly_report') }}"><button class="button secondary" type="submit">Сформировать отчёт за неделю</button></form></div><div class="compact-task-list">{% for task in my_tasks %}<a class="compact-task" href="{{ url_for('edit_task', task_id=task.id) }}"><span class="status-dot"></span><span class="compact-task-body"><strong>{{ task.title }}</strong><small>{{ task.department_name }} · {{ task.workflow_status }}</small></span><span class="compact-deadline">{{ task.deadline|ru_datetime }}</span></a>{% else %}<div class="empty-state">Задач нет.</div>{% endfor %}</div></section>
+<form class="profile-switch" method="post" action="{{ url_for('set_current_employee') }}"><label for="profile-employee">Сменить сотрудника на этом компьютере</label><select id="profile-employee" name="employee_id" onchange="this.form.submit()">{% for person in layout_employees %}<option value="{{ person.id }}" {{ 'selected' if person.id == employee.id else '' }}>{{ person.full_name }}</option>{% endfor %}</select></form>
+{% endblock %}

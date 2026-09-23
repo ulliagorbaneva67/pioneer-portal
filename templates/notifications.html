@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}Уведомления{% endblock %}
+{% block content %}
+<section class="page-heading"><div><span class="eyebrow">Центр уведомлений</span><h1>Уведомления</h1><p>Назначения, наблюдение, завершение и просроченные сроки задач.</p></div><form method="post" action="{{ url_for('read_all_notifications') }}"><button class="button secondary" type="submit">Отметить все как прочитанные</button></form></section>
+<section class="panel notification-list">{% for item in notifications %}<a class="notification-item {{ 'unread' if not item.is_read else '' }}" href="{{ url_for('open_notification', notification_id=item.id) }}"><span class="notification-icon">{{ '✓' if item.kind == 'completed' else '!' if item.kind == 'overdue' else '•' }}</span><span><strong>{{ item.text }}</strong><small>{{ item.created_at|ru_datetime }}</small></span>{% if not item.is_read %}<i aria-label="Не прочитано"></i>{% endif %}</a>{% else %}<div class="empty-state large"><strong>Уведомлений пока нет</strong><span>Новые события по задачам появятся здесь.</span></div>{% endfor %}</section>
+{% endblock %}
