@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Вход в ПИОНЕР{% endblock %}
+{% block content %}
+<section class="panel form-panel narrow site-login">
+    <span class="eyebrow">Защищённый доступ</span>
+    <h1>Вход в ПИОНЕР</h1>
+    <p>Введите общий пароль корпоративного портала.</p>
+    <form method="post">
+        <label class="field"><span>Пароль</span><input type="password" name="password" required autofocus autocomplete="current-password"></label>
+        <button class="button full" type="submit">Войти</button>
+    </form>
+</section>
+{% endblock %}

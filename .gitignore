@@ -7,5 +7,7 @@ pioneer.db
 uploads/*
 !uploads/.gitkeep
 ПИОНЕР_*.zip
+pioneer-data.zip
 .env
+pioneer-data/
 .DS_Store

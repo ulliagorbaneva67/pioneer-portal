@@ -1,5 +1,6 @@
 import os
 import csv
+import hmac
 import io
 import shutil
 import sqlite3
@@ -25,9 +26,10 @@ from werkzeug.utils import secure_filename
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DATABASE = BASE_DIR / "pioneer.db"
-UPLOAD_DIR = BASE_DIR / "uploads"
-BACKUP_DIR = BASE_DIR / "backups"
+DATA_DIR = Path(os.environ.get("PIONEER_DATA_DIR", BASE_DIR)).expanduser().resolve()
+DATABASE = DATA_DIR / "pioneer.db"
+UPLOAD_DIR = DATA_DIR / "uploads"
+BACKUP_DIR = DATA_DIR / "backups"
 
 IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
 DOCUMENT_EXTENSIONS = IMAGE_EXTENSIONS | {"pdf", "doc", "docx", "xls", "xlsx", "txt", "zip"}
@@ -61,7 +63,11 @@ app.config.update(
     SECRET_KEY=os.environ.get("PIONEER_SECRET_KEY", "pioneer-local-secret-change-me"),
     MAX_CONTENT_LENGTH=16 * 1024 * 1024,
     UPLOAD_FOLDER=str(UPLOAD_DIR),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.environ.get("PIONEER_HTTPS") == "1",
 )
+ACCESS_PASSWORD = os.environ.get("PIONEER_ACCESS_PASSWORD", "")
 
 
 SCHEMA = """
@@ -519,6 +525,35 @@ def require_feature(feature):
     return employee_id
 
 
+@app.before_request
+def require_site_login():
+    if not ACCESS_PASSWORD or request.endpoint in {"site_login", "static"}:
+        return None
+    if not session.get("site_authenticated"):
+        return redirect(url_for("site_login"))
+    return None
+
+
+@app.route("/site-login", methods=["GET", "POST"])
+def site_login():
+    if not ACCESS_PASSWORD:
+        return redirect(url_for("dashboard"))
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if hmac.compare_digest(password, ACCESS_PASSWORD):
+            session.clear()
+            session["site_authenticated"] = True
+            return redirect(url_for("dashboard"))
+        flash("Неверный пароль портала.", "error")
+    return render_template("site_login.html")
+
+
+@app.post("/site-logout")
+def site_logout():
+    session.clear()
+    return redirect(url_for("site_login"))
+
+
 def default_approvers():
     employees = active_employees()
     director = next((e for e in employees if e["portal_role"] == "director"), None)
@@ -773,6 +808,7 @@ def create_daily_backup():
 
 
 def init_database():
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
     UPLOAD_DIR.mkdir(exist_ok=True)
     BACKUP_DIR.mkdir(exist_ok=True)
     create_daily_backup()
