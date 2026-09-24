@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Персональный вход{% endblock %}
+{% block content %}
+<section class="panel form-panel narrow site-login">
+    <span class="eyebrow">Персональный доступ</span>
+    <h1>Вход в ПИОНЕР</h1>
+    <p>Введите рабочую электронную почту и уникальный код из карточки сотрудника.</p>
+    <form method="post">
+        <label class="field"><span>Электронная почта</span><input type="email" name="email" required autofocus autocomplete="email"></label>
+        <label class="field"><span>Пароль / код доступа</span><input type="password" name="code" required autocomplete="current-password" maxlength="16"></label>
+        <button class="button full" type="submit">Войти</button>
+    </form>
+</section>
+{% endblock %}

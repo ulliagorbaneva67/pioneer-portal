@@ -3,7 +3,7 @@
 {% block content %}
 <section class="page-heading">
     <div><span class="eyebrow">Контроль исполнения</span><h1>{{ title }}</h1><p>{% if completed %}Архив закрытых задач сохраняется автоматически.{% else %}Просроченные задачи остаются здесь, пока не будут выполнены.{% endif %}</p></div>
-    {% if not completed %}<a class="button" href="{{ url_for('new_task') }}">+ Новая задача</a>{% endif %}
+    <div class="form-actions"><a class="button ghost" href="{{ url_for('export_tasks', completed='1' if completed else '0', format='xlsx', department_id=request.args.get('department_id'), workflow=request.args.get('workflow'), priority=request.args.get('priority'), deadline_from=request.args.get('deadline_from'), deadline_to=request.args.get('deadline_to')) }}">Excel</a><a class="button ghost" href="{{ url_for('export_tasks', completed='1' if completed else '0', format='docx', department_id=request.args.get('department_id'), workflow=request.args.get('workflow'), priority=request.args.get('priority'), deadline_from=request.args.get('deadline_from'), deadline_to=request.args.get('deadline_to')) }}">Word</a>{% if not completed %}<a class="button" href="{{ url_for('new_task') }}">+ Новая задача</a>{% endif %}</div>
 </section>
 
 <div class="tab-bar">
@@ -12,6 +12,7 @@
 </div>
 
 <section class="panel table-panel">
+    <form class="task-filters" method="get"><label>Отдел<select name="department_id"><option value="">Все отделы</option>{% for department in departments %}<option value="{{ department.id }}" {{ 'selected' if request.args.get('department_id', type=int)==department.id else '' }}>{{ department.name }}</option>{% endfor %}</select></label><label>Состояние<select name="workflow"><option value="">Все состояния</option>{% for state in ['Новая','В работе','На проверке','На доработке','Выполнено'] %}<option value="{{ state }}" {{ 'selected' if request.args.get('workflow')==state else '' }}>{{ 'На согласовании' if state == 'На проверке' else state }}</option>{% endfor %}</select></label><label>Приоритет<select name="priority"><option value="">Все приоритеты</option>{% for item in ['Обычная','Важная','Срочная','Критическая'] %}<option value="{{ item }}" {{ 'selected' if request.args.get('priority')==item else '' }}>{{ item }}</option>{% endfor %}</select></label><label>Дедлайн с<input type="date" name="deadline_from" value="{{ request.args.get('deadline_from','') }}"></label><label>Дедлайн по<input type="date" name="deadline_to" value="{{ request.args.get('deadline_to','') }}"></label><button class="button secondary" type="submit">Применить</button></form>
     {% if tasks %}
     <div class="table-wrap">
         <table>
@@ -19,7 +20,7 @@
             <tbody>
             {% for task, state, label in tasks %}
                 <tr class="task-row task-{{ state }}">
-                    <td><strong>{% if state == 'completed' %}✅{% elif state == 'overdue' %}🔴{% elif task.priority in ['Срочная', 'Критическая'] %}⏰{% elif task.priority == 'Важная' %}⚠️{% endif %} {{ task.title }}</strong><small>{{ task.description|truncate(90) or 'Без описания' }}</small><span class="priority priority-{{ task.priority|lower }}">{{ task.priority }}</span></td>
+                    <td><strong>№ {{ task.department_number or task.id }} · {% if state == 'completed' %}✅{% elif state == 'overdue' %}🔴{% elif task.priority in ['Срочная', 'Критическая'] %}⏰{% elif task.priority == 'Важная' %}⚠️{% endif %} {{ task.title }}</strong><small>{{ task.description|truncate(90) or 'Без описания' }}</small><span class="priority priority-{{ task.priority|lower }}">{{ task.priority }}</span></td>
                     <td>{{ task.department_name }}</td>
                     <td class="task-people"><span>Исполнители:</span>{% for person in people[task.id][0] %}<span class="person-chip">{% if person.photo %}<img src="{{ url_for('uploaded_file', filename=person.photo) }}" alt="">{% else %}<i>{{ person.full_name[0] }}</i>{% endif %}{{ person.full_name }}{{ ' (уволен)' if person.is_dismissed else '' }}</span>{% endfor %}<small>Наблюдатели:</small>{% for person in people[task.id][1] %}<span class="person-chip">{% if person.photo %}<img src="{{ url_for('uploaded_file', filename=person.photo) }}" alt="">{% else %}<i>{{ person.full_name[0] }}</i>{% endif %}{{ person.full_name }}{{ ' (уволен)' if person.is_dismissed else '' }}</span>{% else %}<small>—</small>{% endfor %}</td>
                     <td>{{ task.created_date|ru_date }}</td>

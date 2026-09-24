@@ -116,10 +116,15 @@ with tempfile.TemporaryDirectory() as temp_directory:
     assert client.get("/settings").status_code == 302
     assert client.get("/employees/new").status_code == 302
     assert client.get("/feed/new").status_code == 302
+    period_page = client.get("/calendar?date_from=2026-08-31&date_to=2026-09-06").data.decode("utf-8")
+    assert 'name="date_from" value="2026-08-31"' in period_page and 'name="date_to" value="2026-09-06"' in period_page
 
     deadline = (datetime.now() + timedelta(days=2)).isoformat(timespec="minutes")
     with closing(sqlite3.connect(test_database)) as connection:
         approver_ids = [row[0] for row in connection.execute("SELECT id FROM employees WHERE is_dismissed=0 ORDER BY CASE portal_role WHEN 'director' THEN 0 WHEN 'deputy' THEN 1 ELSE 2 END,id LIMIT 2")]
+        connection.execute("INSERT INTO employee_positions (employee_id,position_name,rate,project,is_primary) VALUES (2,'Тестовая роль',0.5,'Проект ПИОНЕР',0)")
+        task_position_id = connection.execute("SELECT last_insert_rowid()").fetchone()[0]
+        connection.commit()
     response = client.post(
         "/tasks/new",
         data={
@@ -131,12 +136,24 @@ with tempfile.TemporaryDirectory() as temp_directory:
             "observers": "1",
             "approvers": [str(item) for item in approver_ids],
             "priority": "Обычная",
+            "position_2": str(task_position_id),
         },
     )
     assert response.status_code == 302
 
     with closing(sqlite3.connect(test_database)) as connection:
         task_id = connection.execute("SELECT MAX(id) FROM tasks").fetchone()[0]
+        assert connection.execute("SELECT employee_position_id FROM task_positions WHERE task_id=? AND employee_id=2", (task_id,)).fetchone()[0] == task_position_id
+    task_card = client.get(f"/tasks/{task_id}/edit").data.decode("utf-8")
+    assert "Суть задачи (ТЗ)" in task_card and "История участников" not in task_card
+
+    # Прошедший срок допустимо сохранить при редактировании задачи.
+    past_deadline = (datetime.now() - timedelta(days=1)).isoformat(timespec="minutes")
+    task_form = {"title": "Тестовая задача", "description": "Проверка", "department_id": "1", "deadline": past_deadline, "assignees": "2", "observers": "1", "approvers": [str(item) for item in approver_ids], "priority": "Обычная"}
+    assert client.post(f"/tasks/{task_id}/edit", data=task_form).status_code == 302
+    assert row_count(test_database, "tasks", f"id={task_id} AND deadline='{past_deadline}'") == 1
+    task_form["deadline"] = deadline
+    assert client.post(f"/tasks/{task_id}/edit", data=task_form).status_code == 302
 
     # Согласующий не может вернуть задачу до отправки на проверку.
     client.post("/current-employee", data={"employee_id": str(approver_ids[0])})
@@ -154,6 +171,7 @@ with tempfile.TemporaryDirectory() as temp_directory:
     assert row_count(test_database, "tasks", f"id = {task_id} AND status = 'В работе' AND workflow_status = 'На проверке'") == 1
     revision_deadline = (datetime.now() + timedelta(days=3)).isoformat(timespec="minutes")
     client.post("/current-employee", data={"employee_id": str(approver_ids[0])})
+    assert "Закрыть задачу" in client.get(f"/tasks/{task_id}/edit").data.decode("utf-8")
     client.post(f"/tasks/{task_id}/revision", data={"comment": "Добавьте результат", "new_deadline": revision_deadline})
     assert row_count(test_database, "tasks", f"id = {task_id} AND workflow_status = 'На доработке' AND deadline = '{revision_deadline}'") == 1
     client.post("/current-employee", data={"employee_id": "2"})
@@ -162,6 +180,74 @@ with tempfile.TemporaryDirectory() as temp_directory:
         client.post("/current-employee", data={"employee_id": str(approver_id)})
         client.post(f"/tasks/{task_id}/approve")
     assert row_count(test_database, "tasks", f"id = {task_id} AND status = 'Выполнено'") == 1
+
+    # Любой назначенный согласующий может закрыть задачу, когда она отправлена на проверку.
+    client.post("/tasks/new", data={"title": "Закрытие согласующим", "department_id": "1", "deadline": deadline, "assignees": "2", "observers": "1", "approvers": [str(item) for item in approver_ids], "priority": "Обычная"})
+    with closing(sqlite3.connect(test_database)) as connection:
+        close_task_id = connection.execute("SELECT MAX(id) FROM tasks").fetchone()[0]
+    client.post("/current-employee", data={"employee_id": "2"})
+    client.post(f"/tasks/{close_task_id}/start")
+    client.post(f"/tasks/{close_task_id}/complete")
+    client.post("/current-employee", data={"employee_id": str(approver_ids[0])})
+    assert client.post(f"/tasks/{close_task_id}/close").status_code == 302
+    assert row_count(test_database, "tasks", f"id={close_task_id} AND status='Выполнено' AND workflow_status='Выполнено'") == 1
+
+    # Ролевое представление: исполнитель видит только рабочую часть, согласующий — историю и управление сроком.
+    client.post("/current-employee", data={"employee_id": "1"})
+    role_deadline = (datetime.now() + timedelta(days=4)).isoformat(timespec="minutes")
+    assert client.post("/tasks/new", data={"title": "Ролевая задача", "description": "Подготовить видеорезультат", "department_id": "2", "deadline": role_deadline, "assignees": "3", "observers": "5", "approvers": [str(item) for item in approver_ids], "priority": "Важная"}).status_code == 302
+    with closing(sqlite3.connect(test_database)) as connection:
+        role_task_id = connection.execute("SELECT MAX(id) FROM tasks").fetchone()[0]
+    client.post("/current-employee", data={"employee_id": "3"})
+    executor_card = client.get(f"/tasks/{role_task_id}/edit").data.decode("utf-8")
+    assert "Суть задачи (ТЗ)" in executor_card and "История участников" not in executor_card
+    assert "Принять задачу" not in executor_card and "Изменить дедлайн" not in executor_card
+    client.post(f"/tasks/{role_task_id}/start")
+    result_response = client.post(f"/tasks/{role_task_id}/complete", data={"result_comment": "Работа выполнена, видео приложено", "attachment": (BytesIO(b"video"), "result.mp4")}, content_type="multipart/form-data")
+    assert result_response.status_code == 302
+    assert row_count(test_database, "tasks", f"id={role_task_id} AND workflow_status='На проверке'") == 1
+    assert row_count(test_database, "task_comments", f"task_id={role_task_id} AND author_id=3") == 1
+    assert row_count(test_database, "task_files", f"task_id={role_task_id} AND author_id=3 AND original_name='result.mp4'") == 1
+    review_card = client.get(f"/tasks/{role_task_id}/edit").data.decode("utf-8")
+    assert "Результат находится на согласовании" in review_card and "История участников" not in review_card
+    client.post("/current-employee", data={"employee_id": "5"})
+    observer_card = client.get(f"/tasks/{role_task_id}/edit").data.decode("utf-8")
+    assert "Результат находится на согласовании" in observer_card and "История участников" not in observer_card
+    client.post("/employees/5/status", data={"presence_status": "sick", "absence_start": date.today().isoformat(), "absence_end": (date.today() + timedelta(days=1)).isoformat()})
+    assert row_count(test_database, "task_substitutions", f"task_id={role_task_id} AND original_employee_id=5 AND role_type='observer' AND is_active=1") == 1
+    assert row_count(test_database, "notifications", f"employee_id=3 AND task_id={role_task_id} AND kind LIKE 'substitution-%'") >= 1
+    client.post("/current-employee", data={"employee_id": "3"})
+    assert "Произошла замена участника" in client.get(f"/tasks/{role_task_id}/edit").data.decode("utf-8")
+    client.post("/current-employee", data={"employee_id": "5"})
+    client.post("/employees/5/status", data={"presence_status": "online"})
+    client.post("/current-employee", data={"employee_id": "1"})
+    approver_card = client.get(f"/tasks/{role_task_id}/edit").data.decode("utf-8")
+    assert "История участников" in approver_card and "Изменить дедлайн" in approver_card and "Ручная замена участника" in approver_card and "result.mp4" in approver_card
+    # Будущий отпуск не меняет роли заранее; согласователь может выполнить обоснованную ручную замену.
+    client.post("/current-employee", data={"employee_id": "2"})
+    future_start = (date.today() + timedelta(days=5)).isoformat()
+    future_end = (date.today() + timedelta(days=7)).isoformat()
+    client.post("/employees/2/status", data={"presence_status": "vacation", "absence_start": future_start, "absence_end": future_end})
+    assert row_count(test_database, "employees", "id=2 AND presence_status!='vacation'") == 1
+    assert row_count(test_database, "task_substitutions", f"task_id={role_task_id} AND original_employee_id=2") == 0
+    client.post("/current-employee", data={"employee_id": "1"})
+    assert client.post(f"/tasks/{role_task_id}/replace-participant", data={"role_type": "observer", "original_employee_id": "5", "replacement_employee_id": "2", "reason": "Наблюдатель недоступен"}).status_code == 302
+    assert row_count(test_database, "task_observers", f"task_id={role_task_id} AND employee_id=2") == 1
+    assert row_count(test_database, "task_substitutions", f"task_id={role_task_id} AND role_type='observer' AND source='manual' AND reason='Наблюдатель недоступен'") == 1
+    assert row_count(test_database, "notifications", f"task_id={role_task_id} AND kind LIKE 'manual-substitution-%'") >= 1
+    changed_deadline = (datetime.now() + timedelta(days=5)).isoformat(timespec="minutes")
+    client.post(f"/tasks/{role_task_id}/deadline", data={"deadline": changed_deadline, "reason": "Дополнительная проверка"})
+    assert row_count(test_database, "tasks", f"id={role_task_id} AND deadline='{changed_deadline}'") == 1
+    revision_deadline = (datetime.now() + timedelta(days=6)).isoformat(timespec="minutes")
+    client.post(f"/tasks/{role_task_id}/revision", data={"comment": "Исправьте титры", "new_deadline": revision_deadline})
+    client.post("/current-employee", data={"employee_id": "3"})
+    revision_card = client.get(f"/tasks/{role_task_id}/edit").data.decode("utf-8")
+    assert "Задача возвращена на доработку" in revision_card and "Исправьте титры" in revision_card
+    client.post(f"/tasks/{role_task_id}/complete", data={"result_comment": "Титры исправлены"})
+    client.post("/current-employee", data={"employee_id": "1"})
+    client.post(f"/tasks/{role_task_id}/close")
+    assert row_count(test_database, "tasks", f"id={role_task_id} AND status='Выполнено'") == 1
+    assert row_count(test_database, "notifications", f"employee_id=3 AND task_id={role_task_id} AND text LIKE '%перенесена в выполненные%'") >= 1
 
     client.post("/current-employee", data={"employee_id": str(approver_ids[0])})
 
@@ -200,6 +286,13 @@ with tempfile.TemporaryDirectory() as temp_directory:
     with closing(sqlite3.connect(test_database)) as connection:
         assert connection.execute("SELECT presence_status FROM employees WHERE id = 1").fetchone()[0] == initial_status
         assert connection.execute("SELECT presence_status FROM employees WHERE id = 2").fetchone()[0] == "meeting"
+
+    missing_period = client.post("/profile", data={"presence_status": "vacation"}).data.decode("utf-8")
+    assert "Вы не указали период. Заполните, пожалуйста" in missing_period
+    assert row_count(test_database, "employees", "id=2 AND presence_status='meeting'") == 1
+    assert client.post("/profile", data={"presence_status": "vacation", "absence_start": date.today().isoformat(), "absence_end": (date.today() + timedelta(days=2)).isoformat()}).status_code == 302
+    assert row_count(test_database, "employees", "id=2 AND presence_status='vacation'") == 1
+    client.post("/profile", data={"presence_status": "online"})
 
     client.post("/current-employee", data={"employee_id": str(approver_ids[0])})
     client.post(
@@ -259,18 +352,22 @@ with tempfile.TemporaryDirectory() as temp_directory:
 
     client.post(
         "/meetings/new",
-        data={"topic": "Тестовая встреча", "meeting_at": deadline, "event_type": "meeting", "participants": ["1", "2"], "notes": "Проверка"},
+        data={"topic": "Тестовая встреча", "meeting_at": deadline, "event_type": "vks", "participants": ["1", "2"], "notes": "Проверка"},
     )
     assert row_count(test_database, "meetings", "topic = 'Тестовая встреча'") == 1
     with closing(sqlite3.connect(test_database)) as connection:
         room_id = connection.execute("SELECT id FROM rooms ORDER BY id LIMIT 1").fetchone()[0]
-    booking_date = (date.today() + timedelta(days=1)).isoformat()
-    booking = {"room_id": str(room_id), "booking_date": booking_date, "start_hour": "10", "end_hour": "12", "title": "Совещание", "department_id": "1", "responsible_employee_id": "1"}
+    booking_date = (date.today() + timedelta(days=90)).isoformat()
+    booking = {"room_id": str(room_id), "booking_date": booking_date, "start_hour": "10", "end_hour": "12", "title": "Совещание", "department_ids": ["1", "2"], "responsible_employee_ids": ["1", "2"]}
     client.post("/calendar/rooms/book", data=booking)
-    assert row_count(test_database, "room_bookings", f"room_id = {room_id}") == 1
+    with closing(sqlite3.connect(test_database)) as connection:
+        booking_id = connection.execute("SELECT MAX(id) FROM room_bookings WHERE room_id=?", (room_id,)).fetchone()[0]
+    assert row_count(test_database, "room_booking_departments", f"booking_id={booking_id}") == 2
+    assert row_count(test_database, "room_booking_responsibles", f"booking_id={booking_id}") == 2
+    assert row_count(test_database, "notifications", f"entity_type='room_booking' AND entity_id={booking_id} AND kind='room-booking-created'") == 2
     booking.update(start_hour="11", end_hour="13", title="Пересечение")
     client.post("/calendar/rooms/book", data=booking)
-    assert row_count(test_database, "room_bookings", f"room_id = {room_id}") == 1
+    assert row_count(test_database, "room_bookings", f"room_id={room_id} AND booking_date='{booking_date}'") == 1
 
     # Цвета: приоритет завершённой задачи выше просрочки, далее срок меньше суток.
     assert portal.task_visual_state({"status": "Выполнено", "deadline": "2000-01-01T00:00"})[0] == "completed"
@@ -290,6 +387,10 @@ with tempfile.TemporaryDirectory() as temp_directory:
     assert row_count(test_database, "notifications", f"task_id = {overdue_task_id} AND kind = 'assigned'") == 2
     assert row_count(test_database, "notifications", f"task_id = {overdue_task_id} AND kind = 'observing'") == 1
     client.post("/current-employee", data={"employee_id": "2"})
+    proposed_deadline = (datetime.now() + timedelta(days=4)).isoformat(timespec="minutes")
+    client.post(f"/tasks/{overdue_task_id}/extension-request", data={"comment": "Нужно дождаться ответа", "proposed_deadline": proposed_deadline})
+    assert row_count(test_database, "task_history", f"task_id={overdue_task_id} AND event='extension-request'") == 1
+    assert row_count(test_database, "notifications", f"task_id={overdue_task_id} AND kind LIKE 'extension-request-%'") >= 2
     client.get("/notifications")
     client.get("/notifications")
     assert row_count(test_database, "notifications", f"task_id = {overdue_task_id} AND kind = 'overdue'") == 3
@@ -303,7 +404,7 @@ with tempfile.TemporaryDirectory() as temp_directory:
     assert row_count(test_database, "notifications", "employee_id = 2 AND is_read = 0") == 0
     assert client.get("/notifications/999999/open").status_code == 404
 
-    assert "initial:" in client.get(f"/tasks/{overdue_task_id}/edit").data.decode("utf-8")
+    assert "initial:" not in client.get(f"/tasks/{overdue_task_id}/edit").data.decode("utf-8")
     client.post("/current-employee", data={"employee_id": str(approver_ids[0])})
     assert client.post(f"/tasks/{overdue_task_id}/reassign", data={"assignees": [str(new_employee_id), "3"], "reason": "Поменялись обязанности"}).status_code == 302
     assert row_count(test_database, "task_history", f"task_id = {overdue_task_id} AND event = 'reassign'") == 1
@@ -356,6 +457,11 @@ with tempfile.TemporaryDirectory() as temp_directory:
     assert client.post(f"/messages/{private_id}/send", data={"text": "Не своё"}).status_code == 404
 
     # Увольнение не удаляет задачи, скрывает личный чат и публикует новость с комментариями.
+    client.post(f"/employees/{new_employee_id}/edit", data={"full_name": "Тестовый Сотрудник", "department_id": "2", "position": "Старший специалист", "birth_date": "1990-01-01", "substitute_id": "2", "is_department_head": "1"})
+    assert row_count(test_database, "employees", f"id={new_employee_id} AND portal_role='head' AND substitute_id=2") == 1
+    assert row_count(test_database, "employees", "department_id=2 AND portal_role='head' AND is_dismissed=0") == 1
+    employee_card = client.get(f"/employees/{new_employee_id}").data.decode("utf-8")
+    assert "Сотрудник на замену" in employee_card and "Дата рождения" in employee_card and "лет" in employee_card
     assert client.post(f"/employees/{new_employee_id}/dismiss").status_code == 302
     assert row_count(test_database, "employees", f"id = {new_employee_id} AND is_dismissed = 1") == 1
     assert "Тестовый Сотрудник (уволен)" in client.get("/tasks/completed").data.decode("utf-8")
@@ -366,6 +472,108 @@ with tempfile.TemporaryDirectory() as temp_directory:
         dismissal_post_id = connection.execute("SELECT MAX(id) FROM posts").fetchone()[0]
     assert client.post(f"/feed/{dismissal_post_id}/comment", data={"text": "Удачи!"}).status_code == 302
     assert "Удачи!" in client.get("/feed").data.decode("utf-8")
+
+    # Персональный доступ: email уникален, код хранится как хеш, вход требует код и просит подтвердить статус.
+    client.post("/site-logout")
+    client.post("/current-employee", data={"employee_id": "1"})
+    with closing(sqlite3.connect(test_database)) as connection:
+        connection.execute("UPDATE employees SET email='person@example.test' WHERE id=2")
+        connection.commit()
+    assert client.post("/employees/2/access-code").status_code == 302
+    with closing(sqlite3.connect(test_database)) as connection:
+        code, code_hash = connection.execute("SELECT access_code_display,access_code_hash FROM employees WHERE id=2").fetchone()
+    assert code and code not in code_hash
+    personal_client = portal.app.test_client()
+    assert personal_client.post("/login", data={"email": "person@example.test", "code": "WRONG"}).status_code == 200
+    assert personal_client.post("/login", data={"email": "person@example.test", "code": code}).status_code == 302
+    login_page = personal_client.get("/").data.decode("utf-8")
+    assert "Проверьте свой статус присутствия" in login_page and "Включите таймер рабочего дня" in login_page
+    assert row_count(test_database, "notifications", "employee_id=2 AND kind LIKE 'login-reminder-%'") == 1
+    personal_client.post("/profile/confirm-status", data={"presence_status": "online"})
+    assert "Проверьте свой статус присутствия" not in personal_client.get("/").data.decode("utf-8")
+    assert row_count(test_database, "workday_sessions", "employee_id=2 AND ended_at IS NULL") == 1
+    with closing(sqlite3.connect(test_database)) as connection:
+        connection.execute("""INSERT INTO notifications (employee_id,kind,text,created_at,entity_type,entity_id,action_url)
+            VALUES (2,'workday-reminder','Скоро конец рабочего дня. Не забудьте выключить таймер и сменить статус.',?,'workday',999,'/profile')""", (datetime.now().isoformat(timespec="minutes"),))
+        connection.commit()
+    popup_status = personal_client.get("/notifications/status").get_json()
+    assert popup_status["popup"]["text"] == "Скоро конец рабочего дня. Не забудьте выключить таймер и сменить статус."
+    timer_page = personal_client.get("/profile").data.decode("utf-8")
+    assert "Выключить таймер" in timer_page and "data-workday-timer" in timer_page and "data-started-at" in timer_page
+    personal_client.post("/workday/stop")
+    assert row_count(test_database, "workday_sessions", "employee_id=2 AND ended_at IS NOT NULL") == 1
+    personal_client.post("/current-employee", data={"employee_id": "1"})
+    assert second_name in personal_client.get("/profile").data.decode("utf-8")
+
+    # Реакции и вложения комментариев сохраняются независимо от старого лайка.
+    with closing(sqlite3.connect(test_database)) as connection:
+        post_id = connection.execute("SELECT MIN(id) FROM posts").fetchone()[0]
+    personal_client.post(f"/feed/{post_id}/reaction", data={"reaction": "thanks"})
+    personal_client.post(f"/feed/{post_id}/comment", data={"text": "С файлом", "attachment": (BytesIO(b"note"), "note.txt")}, content_type="multipart/form-data")
+    assert row_count(test_database, "post_reactions", f"post_id={post_id} AND employee_id=2 AND reaction='thanks'") == 1
+    assert row_count(test_database, "comment_attachments") >= 1
+
+    # Встреча уведомляет каждого выбранного участника, включая Ивана Соколова и Марину Цветаеву.
+    meeting_at = (datetime.now() + timedelta(days=1)).isoformat(timespec="minutes")
+    personal_client.post("/meetings/new", data={"topic": "Встреча нового формата", "meeting_at": meeting_at, "event_type": "meeting", "participants": ["2", "4"]})
+    with closing(sqlite3.connect(test_database)) as connection:
+        meeting_id = connection.execute("SELECT MAX(id) FROM meetings").fetchone()[0]
+        assert connection.execute("SELECT organizer_id FROM meetings WHERE id=?", (meeting_id,)).fetchone()[0] == 2
+        notified = {row[0] for row in connection.execute("SELECT employee_id FROM notifications WHERE entity_type='meeting' AND entity_id=? AND kind='meeting-created'", (meeting_id,))}
+        assert {2, 4}.issubset(notified)
+    personal_client.post(f"/meetings/{meeting_id}/recording", data={"recording": (BytesIO(b"record"), "recording.mp3")}, content_type="multipart/form-data")
+    personal_client.post(f"/meetings/{meeting_id}/cancel")
+    assert row_count(test_database, "meetings", f"id={meeting_id} AND status='Отменена' AND recording_stored_name IS NOT NULL") == 1
+    assert row_count(test_database, "notifications", f"entity_type='meeting' AND entity_id={meeting_id}") >= 2
+
+    # Архив требует передачи всех активных обязанностей и сохраняет историю сотрудника.
+    client.post("/site-logout")
+    client.post("/current-employee", data={"employee_id": "1"})
+    transfer_deadline = (datetime.now() + timedelta(days=3)).isoformat(timespec="minutes")
+    client.post("/tasks/new", data={"title": "Передача при увольнении", "department_id": "1", "deadline": transfer_deadline, "assignees": "3", "observers": "1", "approvers": [str(item) for item in approver_ids], "priority": "Обычная"})
+    assert client.post("/employees/3/dismiss", data={"replacement_id": "2", "dismissal_reason": "Тест переноса"}).status_code == 302
+    assert row_count(test_database, "employees", "id=3 AND is_dismissed=1") == 1
+    assert row_count(test_database, "task_assignees", "employee_id=3 AND task_id IN (SELECT id FROM tasks WHERE status='В работе')") == 0
+    assert row_count(test_database, "task_substitutions", "original_employee_id=3 AND source='dismissal' AND reason='Тест переноса'") >= 1
+    assert "Тест переноса" in client.get("/employees/archive").data.decode("utf-8")
+
+    # Руководство получает настоящие документы Excel и Word.
+    selected_month = date.today().strftime("%Y-%m")
+    analytics_page = client.get(f"/analytics?month={selected_month}")
+    assert analytics_page.status_code == 200 and "Дашборд сотрудников" in analytics_page.data.decode("utf-8") and "Выбрать период в календаре" in analytics_page.data.decode("utf-8")
+    excel = client.get(f"/analytics/export?month={selected_month}&format=xlsx")
+    word = client.get(f"/analytics/weekly-export?month={selected_month}&format=docx")
+    employee_excel = client.get("/employees/export")
+    employee_word = client.get("/employees/export?format=docx")
+    archive_excel = client.get("/employees/archive/export")
+    archive_word = client.get("/employees/archive/export?format=docx")
+    room_excel = client.get(f"/calendar/rooms/export?month={selected_month}")
+    room_word = client.get(f"/calendar/rooms/export?month={selected_month}&format=docx")
+    task_excel = client.get("/tasks/export?format=xlsx")
+    task_word = client.get("/tasks/export?format=docx")
+    message_excel = client.get(f"/messages/{general_id}/export")
+    message_word = client.get(f"/messages/{general_id}/export?format=docx")
+    settings_excel = client.get("/settings/export")
+    settings_word = client.get("/settings/export?format=docx")
+    assert excel.status_code == 200 and excel.data[:2] == b"PK"
+    assert word.status_code == 200 and word.data[:2] == b"PK"
+    assert employee_excel.status_code == 200 and employee_excel.data[:2] == b"PK"
+    assert employee_word.status_code == 200 and employee_word.data[:2] == b"PK"
+    assert archive_excel.status_code == 200 and archive_excel.data[:2] == b"PK"
+    assert archive_word.status_code == 200 and archive_word.data[:2] == b"PK"
+    assert room_excel.status_code == 200 and room_excel.data[:2] == b"PK"
+    assert room_word.status_code == 200 and room_word.data[:2] == b"PK"
+    assert task_excel.status_code == 200 and task_excel.data[:2] == b"PK"
+    assert task_word.status_code == 200 and task_word.data[:2] == b"PK"
+    assert message_excel.status_code == 200 and message_excel.data[:2] == b"PK"
+    assert message_word.status_code == 200 and message_word.data[:2] == b"PK"
+    assert settings_excel.status_code == 200 and settings_excel.data[:2] == b"PK"
+    assert settings_word.status_code == 200 and settings_word.data[:2] == b"PK"
+
+    # Без выбранного профиля списки и обзор не раскрывают названия задач.
+    anonymous_client = portal.app.test_client()
+    assert "Ролевая задача" not in anonymous_client.get("/tasks").data.decode("utf-8")
+    assert "Ролевая задача" not in anonymous_client.get("/").data.decode("utf-8")
 
     # Пустые справочники предлагают добавить значение; перезапуск их не заполняет снова.
     empty_database = Path(temp_directory) / "empty.db"

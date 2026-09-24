@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Новая планёрка{% endblock %}
+{% block title %}Новое событие{% endblock %}
 {% block content %}
-<section class="page-heading"><div><span class="eyebrow">Планёрки</span><h1>Создать комнату</h1><p>Добавьте время, участников и ссылку на сервис видеосвязи.</p></div></section>
+<section class="page-heading"><div><span class="eyebrow">Календарь</span><h1>Создать событие</h1><p>Добавьте планёрку, ВКС или обучение. Каждый выбранный участник получит уведомление.</p></div></section>
 <form class="panel form-panel narrow" method="post">
     <div class="form-grid">
         <label class="field field-wide"><span>Тема *</span><input name="topic" required value="{{ request.form.get('topic', '') }}" placeholder="Еженедельная планёрка"></label>

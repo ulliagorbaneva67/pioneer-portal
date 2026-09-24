@@ -1,6 +1,38 @@
 {% extends "base.html" %}
 {% block title %}{{ employee.full_name }}{% endblock %}
 {% block content %}
-<section class="page-heading"><div><span class="eyebrow">Карточка сотрудника</span><h1>{{ employee.full_name }}</h1><p>{{ employee.department_name }}</p></div><a class="button ghost" href="{{ url_for('employees') }}">К сотрудникам</a></section>
-<section class="panel profile-panel"><div class="profile-overview">{% if employee.photo %}<img class="profile-photo" src="{{ url_for('uploaded_file', filename=employee.photo) }}" alt="">{% else %}<div class="profile-photo profile-placeholder">{{ employee.full_name[0] }}</div>{% endif %}<div class="profile-summary"><h2>{{ employee.full_name }}</h2><span class="presence-label" style="color:{{ employee.status_color or '#78827d' }}"><i class="presence-dot"></i>{{ employee.status_label }}{% if employee.absence_start %} (с {{ employee.absence_start|ru_date }} по {{ employee.absence_end|ru_date }}){% endif %}</span></div></div><dl class="profile-facts"><div><dt>Отдел</dt><dd>{{ employee.department_name }}</dd></div><div><dt>Основная должность</dt><dd>{{ employee.position }}</dd></div><div><dt>Дата рождения</dt><dd>{{ employee.birth_date|ru_date }} · {{ employee.birth_date|full_years }} лет</dd></div><div><dt>Свободные слоты</dt><dd>{{ employee.free_slots or 'Не указаны' }}</dd></div></dl>{% if can_rates %}<h3>Совмещения и ставки</h3>{% for item in positions %}<p>{{ item.position_name }} · {{ item.rate }} ставки{% if item.project %} · {{ item.project }}{% endif %}</p>{% endfor %}{% endif %}</section>
+<section class="page-heading">
+    <div><span class="eyebrow">Карточка сотрудника</span><h1>{{ employee.full_name }}{{ ' (уволен)' if employee.is_dismissed else '' }}</h1><p>{{ employee.department_name }}</p></div>
+    <div class="form-actions">{% if can_employees_admin and not employee.is_dismissed %}<a class="button" href="{{ url_for('employee_form', employee_id=employee.id) }}">Изменить</a>{% endif %}<a class="button ghost" href="{{ url_for('employee_archive' if employee.is_dismissed else 'employees') }}">Назад</a></div>
+</section>
+<section class="panel profile-panel">
+    <div class="profile-overview">{% if employee.photo %}<img class="profile-photo" src="{{ url_for('uploaded_file', filename=employee.photo) }}" alt="">{% else %}<div class="profile-photo profile-placeholder">{{ employee.full_name[0] }}</div>{% endif %}<div class="profile-summary"><h2>{{ employee.full_name }}</h2><span class="presence-label" style="color:{{ employee.status_color or '#78827d' }}"><i class="presence-dot"></i>{{ employee.status_label }}{% if employee.absence_start %} (с {{ employee.absence_start|ru_date }} по {{ employee.absence_end|ru_date }}){% endif %}</span></div></div>
+    <dl class="profile-facts">
+        <div><dt>Отдел</dt><dd>{{ employee.department_name }}</dd></div>
+        <div><dt>Основная должность</dt><dd>{{ employee.position }}</dd></div>
+        <div><dt>Начальник отдела</dt><dd>{% if department_head %}<a class="text-link" href="{{ url_for('employee_card', employee_id=department_head.id) }}">{{ department_head.full_name }}</a>{% else %}Не назначен{% endif %}</dd></div>
+        <div><dt>Сотрудник на замену</dt><dd>{% if personal_substitute %}<a class="text-link" href="{{ url_for('employee_card', employee_id=personal_substitute.id) }}">{{ personal_substitute.full_name }}</a>{% else %}Автоматический подбор{% endif %}</dd></div>
+        <div><dt>Дата рождения</dt><dd>{{ employee.birth_date|ru_date }} · {{ employee.birth_date|full_years }} лет</dd></div>
+        <div><dt>Электронная почта</dt><dd>{{ employee.email or 'Не указана' }}</dd></div>
+        <div><dt>Свободные слоты</dt><dd>{{ employee.free_slots or 'Не указаны' }}</dd></div>
+        {% if employee.is_dismissed %}<div><dt>Дата увольнения</dt><dd>{{ employee.dismissed_at|ru_datetime }}</dd></div><div><dt>Причина</dt><dd>{{ employee.dismissal_reason or 'Не указана' }}</dd></div>{% endif %}
+    </dl>
+    {% if can_rates %}<h3>Совмещения и ставки</h3>{% for item in positions %}<p>{{ item.position_name }} · {{ item.rate }} ставки{% if item.project %} · {{ item.project }}{% endif %}</p>{% endfor %}{% endif %}
+</section>
+{% if can_employees_admin and not employee.is_dismissed %}
+<section class="panel access-panel">
+    <h2>Доступ</h2><p>Пароль показывается только сотрудникам с правом управления кадрами. Вход выполняется по email и паролю.</p><p><strong>{{ employee.access_code_display or 'Пароль ещё не создан' }}</strong></p>
+    <div class="form-actions"><form method="post" action="{{ url_for('regenerate_access_code', employee_id=employee.id) }}" data-confirm="Сгенерировать новый пароль? Старый перестанет работать."><button class="button secondary" type="submit">Сгенерировать пароль</button></form></div>
+</section>
+<section class="panel danger-zone">
+    <h2>Удаление карточки в архив</h2><p>Активных задач и ролей: {{ active_task_count }}. История сотрудника останется в архиве, а вход будет заблокирован.</p>
+    <form method="post" action="{{ url_for('dismiss_employee', employee_id=employee.id) }}" data-confirm="Перенести карточку в архив и закрыть сотруднику доступ?">
+        {% if role_task_counts.assignee %}<label class="field"><span>Новый исполнитель / автор (задач: {{ role_task_counts.assignee }})</span><select name="assignee_replacement_id" required><option value="">Выберите сотрудника</option>{% for person in replacements %}<option value="{{ person.id }}">{{ person.full_name }}</option>{% endfor %}</select></label>{% endif %}
+        {% if role_task_counts.observer %}<label class="field"><span>Новый наблюдатель (задач: {{ role_task_counts.observer }})</span><select name="observer_replacement_id" required><option value="">Выберите сотрудника</option>{% for person in replacements %}<option value="{{ person.id }}">{{ person.full_name }}</option>{% endfor %}</select></label>{% endif %}
+        {% if role_task_counts.approver %}<label class="field"><span>Новый согласующий (задач: {{ role_task_counts.approver }})</span><select name="approver_replacement_id" required><option value="">Выберите сотрудника</option>{% for person in replacements %}<option value="{{ person.id }}">{{ person.full_name }}</option>{% endfor %}</select></label>{% endif %}
+        <label class="field"><span>Причина / комментарий</span><textarea name="dismissal_reason" rows="2"></textarea></label>
+        <div class="form-actions dismiss-actions"><button class="button danger-button" type="submit">Удалить</button></div>
+    </form>
+</section>
+{% endif %}
 {% endblock %}

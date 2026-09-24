@@ -10,19 +10,19 @@
     <aside class="sidebar" id="sidebar">
         <a class="brand" href="{{ url_for('dashboard') }}">
             {% if portal_logo %}<img class="brand-logo" src="{{ url_for('uploaded_file', filename=portal_logo) }}" alt="">{% else %}<span class="brand-mark">П</span>{% endif %}
-            <span>ПИОНЕР</span>
+            <span class="brand-copy"><strong>ПИОНЕР</strong><small>Внутренний портал</small></span>
         </a>
         <nav class="main-nav">
-            <span class="nav-group">Главное</span><a class="{{ 'active' if request.endpoint == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}">Обзор</a>
+            <span class="nav-group">Главное</span><a class="{{ 'active' if request.endpoint == 'dashboard' else '' }}" href="{{ url_for('dashboard') }}"><i>⌂</i> Обзор</a>
             <span class="nav-group">Работа</span>
-            <a class="{{ 'active' if request.endpoint in ['tasks', 'new_task', 'edit_task'] else '' }}" href="{{ url_for('tasks') }}">Задачи</a>
-            <a class="{{ 'active' if request.endpoint == 'completed_tasks' else '' }}" href="{{ url_for('completed_tasks') }}">Выполненные</a>
-            <a class="{{ 'active' if request.endpoint in ['meetings', 'new_meeting', 'book_room'] else '' }}" href="{{ url_for('meetings') }}">Календарь</a>
-            <a class="{{ 'active' if request.endpoint == 'messages' else '' }}" href="{{ url_for('messages') }}">Сообщения</a>
-            <span class="nav-group">Люди</span><a class="{{ 'active' if request.endpoint in ['employees', 'employee_form', 'employee_card'] else '' }}" href="{{ url_for('employees') }}">Сотрудники</a>
-            <a class="{{ 'active' if request.endpoint in ['feed', 'new_post'] else '' }}" href="{{ url_for('feed') }}">Новости</a>
-            {% if can_analytics %}<span class="nav-group">Для руководства</span><a class="{{ 'active' if request.endpoint in ['analytics', 'export_analytics'] else '' }}" href="{{ url_for('analytics') }}">Аналитика</a>{% endif %}
-            {% if can_settings %}<span class="nav-group">Служебное</span><a class="{{ 'active' if request.endpoint in ['settings', 'add_catalog_value', 'rename_catalog_value', 'delete_catalog_value'] else '' }}" href="{{ url_for('settings') }}">Настройки</a>{% endif %}
+            <a class="{{ 'active' if request.endpoint in ['tasks', 'new_task', 'edit_task'] else '' }}" href="{{ url_for('tasks') }}"><i>✓</i> Задачи</a>
+            <a class="{{ 'active' if request.endpoint == 'completed_tasks' else '' }}" href="{{ url_for('completed_tasks') }}"><i>◆</i> Выполненные</a>
+            <a class="{{ 'active' if request.endpoint in ['meetings', 'new_meeting', 'book_room'] else '' }}" href="{{ url_for('meetings') }}"><i>□</i> Календарь</a>
+            <a class="{{ 'active' if request.endpoint == 'messages' else '' }}" href="{{ url_for('messages') }}"><i>✉</i> Сообщения</a>
+            <span class="nav-group">Люди</span><a class="{{ 'active' if request.endpoint in ['employees', 'employee_form', 'employee_card'] else '' }}" href="{{ url_for('employees') }}"><i>●</i> Сотрудники</a>
+            <a class="{{ 'active' if request.endpoint in ['feed', 'new_post'] else '' }}" href="{{ url_for('feed') }}"><i>◇</i> Новости</a>
+            {% if can_analytics %}<span class="nav-group">Для руководства</span><a class="{{ 'active' if request.endpoint in ['analytics', 'export_analytics'] else '' }}" href="{{ url_for('analytics') }}"><i>▥</i> Аналитика</a>{% endif %}
+            {% if can_settings %}<span class="nav-group">Служебное</span><a class="{{ 'active' if request.endpoint in ['settings', 'add_catalog_value', 'rename_catalog_value', 'delete_catalog_value'] else '' }}" href="{{ url_for('settings') }}"><i>⚙</i> Настройки</a>{% endif %}
         </nav>
         <div class="sidebar-note">
             <strong>Локальный портал</strong>
@@ -37,10 +37,11 @@
                 <div class="topbar-kicker">Рабочее пространство</div>
                 <strong>ПИОНЕР. Внутренний портал</strong>
             </div>
-            <div class="top-counters"><a href="{{ url_for('tasks') }}">Мои задачи <strong>{{ my_task_count }}</strong></a><a href="{{ url_for('notifications') }}">Новые <strong>{{ unread_count }}</strong></a></div><a class="notification-bell" data-unread-count="{{ unread_count }}" data-sound="{{ '1' if notification_sound else '0' }}" href="{{ url_for('notifications') }}" aria-label="Уведомления{{ ': ' ~ unread_count ~ ' новых' if unread_count else '' }}" title="Уведомления">🔔{% if unread_count %}<span class="notification-count">{{ unread_count }}</span>{% endif %}</a>
+            <div class="top-counters"><a href="{{ url_for('tasks') }}">Мои задачи <strong>{{ my_task_count }}</strong></a><a href="{{ url_for('notifications') }}">Новые <strong>{{ unread_count }}</strong></a></div><a class="notification-bell" data-unread-count="{{ unread_count }}" data-employee-id="{{ current_employee.id if current_employee else '' }}" data-status-url="{{ url_for('notification_status') }}" data-sound="{{ '1' if notification_sound else '0' }}" href="{{ url_for('notifications') }}" aria-label="Уведомления{{ ': ' ~ unread_count ~ ' новых' if unread_count else '' }}" title="Уведомления">🔔{% if unread_count %}<span class="notification-count">{{ unread_count }}</span>{% endif %}</a>
             <a class="profile-avatar {{ 'active' if request.endpoint == 'profile' else '' }}" href="{{ url_for('profile') }}" aria-label="{{ 'Личный профиль: ' ~ current_employee.full_name if current_employee else 'Личный профиль: выберите сотрудника' }}" title="{{ 'Мой профиль' if current_employee else 'Сначала выберите сотрудника' }}">
                 {% if current_employee and current_employee.photo %}<img src="{{ url_for('uploaded_file', filename=current_employee.photo) }}" alt="">{% else %}<span aria-hidden="true">{{ current_employee.full_name[0] if current_employee else 'П' }}</span>{% endif %}
             </a>
+            {% if current_employee %}<form method="post" action="{{ url_for('site_logout') }}"><button class="small-button ghost" type="submit">Выйти</button></form>{% endif %}
         </header>
 
         <main class="content">
@@ -57,6 +58,8 @@
         </main>
     </div>
     <div class="menu-overlay" data-menu-overlay></div>
+    {% if status_check_required %}<div class="status-check" role="dialog" aria-modal="true" aria-labelledby="status-check-title"><form class="panel form-panel narrow status-dialog" method="post" action="{{ url_for('confirm_status') }}"><span class="modal-icon">◷</span><span class="eyebrow">Начало работы</span><h2 id="status-check-title">Проверьте свой статус присутствия</h2><h3>Включите таймер рабочего дня</h3><p>После подтверждения таймер включится автоматически. Если период отсутствия закончился, выберите «В сети».</p><label class="field"><span>Статус</span><select name="presence_status" data-presence-status required>{% for status in layout_statuses %}<option value="{{ status.key }}" data-absence="{{ '1' if status.key in ['vacation','sick','trip','training'] else '0' }}" {{ 'selected' if current_employee.presence_status == status.key else '' }}>{{ status.label }}</option>{% endfor %}</select></label><div data-absence-period hidden><label class="field"><span>С</span><input type="date" name="absence_start"></label><label class="field"><span>По</span><input type="date" name="absence_end"></label></div><button class="button full" type="submit">Понятно, начать рабочий день</button></form></div>{% endif %}
+    <div class="notice-popup" data-notice-popup hidden role="dialog" aria-modal="true" aria-labelledby="notice-popup-title"><div class="panel"><span class="modal-icon">◷</span><span class="eyebrow">Напоминание</span><h2 id="notice-popup-title" data-notice-text></h2><div class="form-actions"><a class="button ghost" data-notice-link href="{{ url_for('profile') }}">Открыть профиль</a><button class="button" type="button" data-notice-close>Понятно</button></div></div></div>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
