@@ -27,6 +27,8 @@
 
 ## GitHub Pages
 
+Интерактивная демонстрация: <https://ulliagorbaneva67.github.io/pioneer-portal/>
+
 GitHub Pages публикует только статические HTML/CSS/JavaScript-файлы. Flask,
 SQLite и серверные маршруты на Pages не запускаются. В каталоге `docs/` находится
 статическая страница-презентация проекта, которую можно опубликовать через Pages.

@@ -3,8 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#102d23">
-  <title>ПИОНЕР. Внутренний портал</title>
+  <meta name="theme-color" content="#0c213d">
+  <meta name="description" content="Интерактивная демонстрация корпоративного портала ПИОНЕР: задачи, сотрудники, календарь, новости и аналитика.">
+  <title>ПИОНЕР · интерактивная демонстрация</title>
   <link rel="stylesheet" href="portal.css">
   <link rel="stylesheet" href="prototype.css">
 </head>
@@ -18,12 +19,13 @@
       <span class="nav-group">Для руководства</span><a href="#analytics" data-route="analytics">Аналитика</a>
       <span class="nav-group">Служебное</span><a href="#settings" data-route="settings">Настройки</a>
     </nav>
-    <div class="sidebar-note"><strong>Локальный портал</strong>Данные этой копии сохраняются в браузере.</div>
+    <div class="sidebar-note"><strong>Интерактивная демоверсия</strong>Изменения сохраняются только в этом браузере. Рабочая база и персональные данные не публикуются.</div>
   </aside>
   <div class="page-shell">
+    <div class="pages-banner"><div><span class="demo-pill">GitHub Pages</span><strong>Демонстрационная версия портала</strong><small>Полная версия с Flask, SQLite, персональным входом и архивом запускается локально.</small></div><div class="pages-banner-actions"><a href="https://github.com/ulliagorbaneva67/pioneer-portal" target="_blank" rel="noreferrer">Исходный код</a><a class="download-link" href="https://github.com/ulliagorbaneva67/pioneer-portal/archive/refs/heads/main.zip">Скачать проект</a></div></div>
     <header class="topbar">
       <button class="menu-button" id="menuButton" type="button" aria-label="Открыть меню">☰</button>
-      <div><div class="topbar-kicker">Рабочее пространство</div><strong>ПИОНЕР. Внутренний портал</strong></div>
+      <div><div class="topbar-kicker">Демонстрационное пространство</div><strong>ПИОНЕР. Внутренний портал</strong></div>
       <div class="top-counters"><a href="#tasks">Мои задачи <strong id="taskCounter">0</strong></a><button data-action="notifications">Новые <strong id="noticeCounter">0</strong></button></div>
       <button class="notification-bell" data-action="notifications" title="Уведомления">🔔<span class="notification-count" id="noticeBadge">0</span></button>
       <button class="profile-avatar" data-action="profile" id="profileAvatar" title="Сменить профиль">А</button>

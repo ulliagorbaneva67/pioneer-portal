@@ -1,4 +1,4 @@
-const STORAGE_KEY = "pioneer-pages-v4";
+const STORAGE_KEY = "pioneer-pages-v5";
 const seed = {
   currentEmployee: 1,
   employees: [
@@ -20,8 +20,11 @@ const seed = {
     {id:1,name:"Общий чат ПИОНЕР",messages:[]}
   ],
   activeChat:1,
-  notifications:[{id:1,text:"Внимание! Анна Петрова находится в статусе «📚 На обучении» с 22.09.2026 по 25.09.2026. Наблюдение передано Ивану Соколову.",read:false}],
-  color:"#146c4b"
+  notifications:[
+    {id:1,text:"Внимание! Анна Петрова находится в статусе «📚 На обучении» с 22.09.2026 по 25.09.2026. Наблюдение передано Ивану Соколову.",read:false},
+    {id:2,text:"Для задачи «Подготовить презентацию проекта» сохранена цепочка замены участника.",read:false}
+  ],
+  color:"#17365d"
 };
 let state = load();
 const app = document.querySelector("#app");
